@@ -1,0 +1,7 @@
+fastapi==0.111.0
+pydantic==2.7.3
+pydantic_core==2.18.4
+python-dotenv==1.0.1
+PyYAML==6.0.1
+uvicorn==0.30.1
+websockets==12.0
