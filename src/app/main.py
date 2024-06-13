@@ -1,58 +1,46 @@
-from typing import List
+from fastapi import FastAPI, Depends
 
-from fastapi import FastAPI
+from fastapi_users import FastAPIUsers
 
-from src.app.validators import User, Trade
+from src.app.auth.base_config import auth_backend
+from src.app.auth.manager import get_user_manager
+from src.app.auth.models import User
+from src.app.auth.schema import UserRead, UserCreate
+from src.app.operations.router import router as router_operations
 
 app = FastAPI(
     title="Trading App"
 )
 
-fake_users = [
-    {
-        'id': 1,
-        'name': 'John Doe',
-        "degree": [{"id": 1,
-                    "created_at": "2022-01-01T00:00:00",
-                    "type_degree": "expert"}]
-    },
-    {
-        'id': 2,
-        'name': 'Jane Doe',
-        "degree": [{"id": 2,
-                    "created_at": "2024-02-02T00:11:00",
-                    "type_degree": "professor"}]
-    }
+fastapi_users = FastAPIUsers[User, int](
+    get_user_manager,
+    [auth_backend],
+)
 
-]
+app.include_router(
+    fastapi_users.get_auth_router(auth_backend),
+    prefix="/auth/jwt",
+    tags=["auth"],
+)
 
-fake_trades = [
-    {"id": 1, "user_id": 1, "currency": "USD", "side": "buy", "price": 123, "amount": 2.11,
-     },
-    {"id": 2, "user_id": 2, "currency": "USD", "side": "buy", "price": 123, "amount": 2.11,
-     }
-]
+app.include_router(
+    fastapi_users.get_register_router(UserRead, UserCreate),
+    prefix="/auth",
+    tags=["auth"],
+)
+
+app.include_router(
+     router_operations
+
+)
+current_user = fastapi_users.current_user()
 
 
-@app.get('/users/{user_id}', response_model=List[User])
-def get_user(user_id: int):
-    return [user for user in fake_users if user['id'] == user_id]
+@app.get("/protected-route")
+def protected_route(user: User = Depends(current_user)):
+    return f"Hello, {user.username}"
 
 
-@app.get('/trades')
-def get_trades(limit: int = 1, offset: int = 0):
-    return fake_trades[offset:][:limit]
-
-
-@app.post('/users/{user_id}')
-def change_user_name(user_id: int, new_name: str):
-    current_user = list(filter(lambda user: user.get('id') == user_id, fake_users))[0]
-    current_user['name'] = new_name
-    return {'status': 200, 'data': current_user}
-
-
-# Post запрос на добавление данных, требующих валидацию
-@app.post('/trades')
-def add_trades(trades: List[Trade]):
-    fake_trades.extend(trades)
-    return {'status': 200, 'data': fake_trades}
+@app.get("/unprotected-route")
+def unprotected_route():
+    return f"Hello, anonymous"
